@@ -21,6 +21,7 @@
 
 // attributes
 #define NORETURN	static __attribute__((noinline,noreturn))
+#define NOINLINE	static __attribute__((noinline))
 
 // logging ----------------------------------------------------------------------------------------
 static
@@ -212,21 +213,11 @@ void usage_exit(const char* exe) {
 	exit(EXIT_FAILURE);
 }
 
-// make sure STDOUT is well buffered
+// option parser
 static
-void make_stdout_buffered(void) {
-	static char buff[64 * Kb];
+void parse_options(int argc, char** argv) {
+	opterr = 0;
 
-	if(setvbuf(stdout, buff, _IOFBF, sizeof(buff)))
-		die_errno("making output buffered (setvbuf)");
-}
-
-// main
-int main(int argc, char** argv) {
-	// make STDERR line-buffered
-	setvbuf(stderr, NULL, _IOLBF, 0);
-
-	// parse options
 	int c;
 
 	while((c = getopt(argc, argv, "qhv")) != -1) {
@@ -261,17 +252,25 @@ int main(int argc, char** argv) {
 		default:
 			die("cannot process more than one input file (%d given)", argc - optind);
 	}
+}
+
+// main
+int main(int argc, char** argv) {
+	// i/o buffering
+	setvbuf(stderr, NULL, _IOLBF, 0);
+	setvbuf(stdout, NULL, _IOFBF, 0);
+
+	// options
+	parse_options(argc, argv);
 
 	// read input
-	const str src = read_input(fileno(stdin));
+	const str src = read_input(STDIN_FILENO);
 
 	if(fclose(stdin))
 		die_errno("reading input");
 
 	log_info("loaded %zu bytes", src.length);
 
-	// prepare for writing
-	make_stdout_buffered();
 
 
 
