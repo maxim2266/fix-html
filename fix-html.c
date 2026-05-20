@@ -6,6 +6,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <err.h>
+#include <errno.h>
+#include <stdint.h>
+
 #include <gumbo.h>
 
 #ifndef VER
@@ -61,7 +64,7 @@ typedef GumboStringPiece str;
 #define fail_if(cond) ({ \
 	if(cond) {  \
 		fclose(stdout); \
-		die_errno("output failed"); \
+		die_errno("writing output"); \
 	}   \
 })
 
@@ -69,7 +72,7 @@ typedef GumboStringPiece str;
 #define write_byte(b)   fail_if(putchar(b) == EOF)
 
 // write out bytes
-static inline
+static
 void write_bytes(const char* const s, const size_t n) {
 	fail_if(n > 0 && fwrite(s, 1, n, stdout) < n);
 }
@@ -134,8 +137,10 @@ void write_attr(const char* s, const char q) {
 				if(*p != q) {
 					++p;
 					continue;
-				} else
-					subst = qs;
+				}
+
+				subst = qs;
+				break;
 		}
 
 		write_bytes(s, p - s);
@@ -144,13 +149,45 @@ void write_attr(const char* s, const char q) {
 	}
 }
 
+// input reader -----------------------------------------------------------------------------------
+#define Kb	1024
+#define Mb	(Kb * Kb)
+#define MAX_INPUT_SIZE	(256 * Mb)
 
-	}
+// fill the given buffer
+static
+size_t fill_buffer(const int fd, uint8_t* const buff, const size_t size) {
+	uint8_t* p = buff;
+	uint8_t* const end = buff + size;
+	ssize_t n;
+
+	do {
+		while((n = read(fd, p, end - p)) < 0)
+			if(errno != EINTR)
+				die_errno("reading input");
+	} while(n > 0 && (p += n) < end);
+
+	return p - buff;
 }
 
+// read the entire input from the given file descriptor
+static
+str read_input(const int fd) {
+	size_t count = 0, size = MAX_INPUT_SIZE / Kb;
+	uint8_t* buff = malloc(size);
 
+	for(;;) {
+		count += fill_buffer(fd, buff + count, size - count);
 
+		if(count < size)
+			return (str){ realloc(buff, count), count };
 
+		if((size *= 2) > MAX_INPUT_SIZE)
+			die("cannot handle input larger than %zuMb", (size_t)MAX_INPUT_SIZE / Mb);
+
+		buff = realloc(buff, size);
+	}
+}
 
 // usage string
 static
@@ -173,6 +210,15 @@ void usage_exit(const char* exe) {
 
 	fprintf(stderr, usage_string, s ? (s + 1) : exe);
 	exit(EXIT_FAILURE);
+}
+
+// make sure STDOUT is well buffered
+static
+void make_stdout_buffered(void) {
+	static char buff[64 * Kb];
+
+	if(setvbuf(stdout, buff, _IOFBF, sizeof(buff)))
+		die_errno("making output buffered (setvbuf)");
 }
 
 // main
@@ -202,13 +248,44 @@ int main(int argc, char** argv) {
 	}
 
 	// check the number of remaining parameters
-	if(argc - optind > 1)
-		die("cannot process more than one input file (%d given)", argc - optind);
+	switch(argc - optind) {
+		case 0: // ok, data from STDIN
+			break;
 
-	// just for now
-	write_html("\"a > b\"\n");
-	write_attr("\"a > b' \"\n", '"');
+		case 1: // redirect STDIN
+			if(!freopen(argv[optind], "r", stdin))
+				die_errno("cannot open \"%s\"", argv[optind]);
 
-	log_info("It works!");
+			break;
+
+		default:
+			die("cannot process more than one input file (%d given)", argc - optind);
+	}
+
+	// read input
+	const str src = read_input(fileno(stdin));
+
+	if(fclose(stdin))
+		die_errno("reading input");
+
+	log_info("loaded %zu bytes", src.length);
+
+	// prepare for writing
+	make_stdout_buffered();
+
+
+
+	// just for a test
+	write_bytes(src.data, src.length);
+
+
+
+	// flush output buffer
+	if(fclose(stdout))
+		die_errno("writing output");
+
+	// for purists
+	free((void*)src.data);
+
 	return 0;
 }
