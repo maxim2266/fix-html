@@ -8,7 +8,7 @@ CFLAGS    := -s -Os -std=c11 -Wall -Wextra
 all: $(BIN)
 
 $(BIN): $(CFILES) version
-	$(CC) $(CFLAGS) -DVER=$(shell ./version) -o $@ $(CFILES)
+	$(CC) $(CFLAGS) -DVER=$(shell ./version) -o $@ $(CFILES) -lgumbo
 	chmod 0711 $@
 
 clean:
