@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include <gumbo.h>
+#include <magic.h>
 
 #ifndef VER
 #error "program version constant is not defined"
@@ -95,53 +96,12 @@ void write_html(const char* s) {
 
 	for(;;) {
 		switch(*p) {
-			case 0:   write_bytes(s, p - s);    return;
-			case '&': subst = str_lit("&amp;"); break;
-			case '<': subst = str_lit("&lt;");  break;
-			case '>': subst = str_lit("&gt;");  break;
+			case 0:   write_bytes(s, p - s);     return;
+			case '&': subst = str_lit("&amp;");  break;
+			case '<': subst = str_lit("&lt;");   break;
+			case '>': subst = str_lit("&gt;");   break;
+			case '"': subst = str_lit("&quot;"); break;
 			default:  ++p; continue;
-		}
-
-		write_bytes(s, p - s);
-		write_bytes(subst.data, subst.length);
-		s = ++p;
-	}
-}
-
-// write out HTML attribute
-static
-void write_attr(const char* s, const char q) {
-	if(!s)
-		return;
-
-	// substitution string
-	str qs;
-
-	switch(q) {
-		case '"':  qs = str_lit("&quot;"); break;
-		case '\'': qs = str_lit("&#39;"); break;
-		default:   qs = str_null; break;	// must never happen
-	}
-
-	// encode
-	str subst;
-	const char* p = s;
-
-	for(;;) {
-		switch(*p) {
-			case 0:   write_bytes(s, p - s);    return;
-			case '&': subst = str_lit("&amp;"); break;
-			case '<': subst = str_lit("&lt;");  break;
-			case '>': subst = str_lit("&gt;");  break;
-
-			default:
-				if(*p != q) {
-					++p;
-					continue;
-				}
-
-				subst = qs;
-				break;
 		}
 
 		write_bytes(s, p - s);
@@ -190,6 +150,65 @@ str read_input(const int fd) {
 	}
 }
 
+// Gumbo parser -----------------------------------------------------------------------------------
+static
+GumboOutput* parse(const str content) {
+	GumboOptions options = kGumboDefaultOptions;
+
+	return gumbo_parse_with_options(&options, content.data, content.length);
+}
+
+#include "write.c"
+
+// MIME type --------------------------------------------------------------------------------------
+static
+bool mime_type_allowed(const char* const mime) {
+	// list of MIME type we accept, apart from text/html
+	static
+	const char* const allowed[] = {
+		"text/plain",
+		"text/xml",
+		"application/xml",
+		"application/xhtml+xml",
+		"application/x-empty",
+		NULL
+	};
+
+	// check one by one
+	for(unsigned i = 0; allowed[i]; ++i)
+		if(strcmp(mime, allowed[i]) == 0)
+			return true;
+
+	return false;
+}
+
+static
+void check_mime_type(const str s) {
+	const int flags = MAGIC_MIME_TYPE | MAGIC_RAW | MAGIC_NO_CHECK_ELF | MAGIC_NO_CHECK_ENCODING;
+	const magic_t m = magic_open(flags);
+
+	if(!m)
+		die("cannot open MIME type detector");
+
+	if(magic_load(m, NULL))
+		die("cannot load MIME type database: %s", magic_error(m));
+
+	const char* const mime = magic_buffer(m, s.data, s.length);
+
+	if(!mime)
+		die("input: cannot detect MIME type: %s", magic_error(m));
+
+	if(strcmp(mime, "text/html")) {
+		if(!mime_type_allowed(mime))
+			die("input: cannot process MIME type \"%s\"", mime);
+
+		log_warn("input: detected MIME type is \"%s\", not \"text/html\"", mime);
+	}
+
+	magic_close(m);
+}
+
+// application ------------------------------------------------------------------------------------
 // usage string
 static
 const char usage_string[] =
@@ -264,27 +283,35 @@ int main(int argc, char** argv) {
 	parse_options(argc, argv);
 
 	// read input
-	const str src = read_input(STDIN_FILENO);
+	const str content = read_input(STDIN_FILENO);
 
 	if(fclose(stdin))
 		die_errno("reading input");
 
-	log_info("loaded %zu bytes", src.length);
+	if(content.length == 0)
+		die("empty input");
 
+	log_info("input: got %zu bytes", content.length);
 
+	// check MIME type
+	check_mime_type(content);
 
+	// parse input
+	GumboOutput* const doc = parse(content);
 
-	// just for a test
-	write_bytes(src.data, src.length);
+	if(doc->errors.length > 0)
+		log_warn("detected %u HTML error(s)", doc->errors.length);
 
-
+	// write output
+	write_document(doc);
 
 	// flush output buffer
 	if(fclose(stdout))
 		die_errno("writing output");
 
-	// for purists
-	free((void*)src.data);
+	// purists are welcome to uncomment these lines:
+	// gumbo_destroy_output(&kGumboDefaultOptions, doc);
+	// free((void*)content.data);
 
 	return 0;
 }
