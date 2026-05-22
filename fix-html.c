@@ -152,14 +152,157 @@ str read_input(const int fd) {
 }
 
 // Gumbo parser -----------------------------------------------------------------------------------
+static inline
+bool is_raw_text_element(GumboTag tag) {
+	return tag == GUMBO_TAG_SCRIPT || tag == GUMBO_TAG_STYLE;
+}
+
+// write out a string with prefix and closing quote if the string is not empty
+static
+bool cond_write(const char* const s, const str prefix) {
+	if(s && *s) {
+		write_bytes(prefix.data, prefix.length);
+		write_cstr(s);
+		write_byte('"');
+
+		return true;
+	}
+
+	return false;
+}
+
+// write out DOCTYPE
+static
+void write_doctype(const GumboDocument* const doc) {
+	if(!doc->has_doctype) {
+		write_lit("<!DOCTYPE html>\n");
+		return;
+	}
+
+	write_lit("<!DOCTYPE ");
+	write_cstr(doc->name);
+
+	if(cond_write(doc->public_identifier, str_lit(" PUBLIC \"")))
+		cond_write(doc->system_identifier, str_lit(" \""));
+	else
+		cond_write(doc->system_identifier, str_lit(" SYSTEM \""));
+
+	write_lit(">\n");
+}
+
+// forward declaration
+static
+void write_node(const GumboNode* node);
+
+// write out element
+static
+void write_element(const GumboElement* const element) {
+	const char* const tag = gumbo_normalized_tagname(element->tag);
+
+	write_byte('<');
+	write_cstr(tag);
+
+	for(unsigned i = 0; i < element->attributes.length; i++) {
+		const GumboAttribute* const attr = element->attributes.data[i];
+
+		write_byte(' ');
+		write_cstr(attr->name);
+
+		if(!attr->value[0])
+			continue;  // boolean attribute
+
+		write_lit("=\"");
+		write_html(attr->value);
+		write_byte('"');
+	}
+
+	write_byte('>');
+
+	switch(element->tag) {
+		case GUMBO_TAG_AREA:   case GUMBO_TAG_BASE:  case GUMBO_TAG_BR:
+		case GUMBO_TAG_COL:    case GUMBO_TAG_EMBED: case GUMBO_TAG_HR:
+		case GUMBO_TAG_IMG:    case GUMBO_TAG_INPUT: case GUMBO_TAG_KEYGEN:
+		case GUMBO_TAG_LINK:   case GUMBO_TAG_META:  case GUMBO_TAG_PARAM:
+		case GUMBO_TAG_SOURCE: case GUMBO_TAG_TRACK: case GUMBO_TAG_WBR:
+			return;	// void tag
+
+		default:
+			break;
+	}
+
+	const bool raw = is_raw_text_element(element->tag);
+
+	for(unsigned i = 0; i < element->children.length; i++) {
+		const GumboNode* const child = element->children.data[i];
+
+		if(raw && (child->type == GUMBO_NODE_TEXT || child->type == GUMBO_NODE_WHITESPACE))
+			write_cstr(child->v.text.text);
+		else
+			write_node(child);
+	}
+
+	write_lit("</");
+	write_cstr(tag);
+	write_byte('>');
+}
+
+// write out HTML node
+static
+void write_node(const GumboNode* const node) {
+	if(!node)
+		return;
+
+	switch(node->type) {
+		case GUMBO_NODE_DOCUMENT: {
+			const GumboDocument* const doc = &node->v.document;
+
+			write_doctype(doc);
+
+			for(unsigned i = 0; i < doc->children.length; i++)
+				write_node(doc->children.data[i]);
+
+			break;
+		}
+
+		case GUMBO_NODE_ELEMENT:
+		case GUMBO_NODE_TEMPLATE:
+			write_element(&node->v.element);
+			break;
+
+		case GUMBO_NODE_TEXT:
+		case GUMBO_NODE_WHITESPACE:
+			write_html(node->v.text.text);
+			break;
+
+		case GUMBO_NODE_CDATA:
+			write_lit("<![CDATA[");
+			write_cstr(node->v.text.text);
+			write_lit("]]>");
+			break;
+
+		case GUMBO_NODE_COMMENT:
+			write_lit("<!--");
+			write_cstr(node->v.text.text);
+			write_lit("-->");
+			break;
+	}
+}
+
+// write out HTML document
+void write_document(GumboOutput* output) {
+	if(output && output->root)
+		write_node(output->document);
+	else
+		die("for some reason parser has failed");
+}
+
+// parse input
 static
 GumboOutput* parse(const str content) {
 	GumboOptions options = kGumboDefaultOptions;
 
 	return gumbo_parse_with_options(&options, content.data, content.length);
 }
-
-#include "write.c"
 
 // MIME type --------------------------------------------------------------------------------------
 static
@@ -188,8 +331,8 @@ bool mime_type_allowed(const char* const mime) {
 }
 
 static
-void check_mime_type(const str s) {
-	const int flags = MAGIC_RAW | MAGIC_NO_CHECK_ELF;
+void check_input_type(const str s) {
+	const int flags = MAGIC_RAW | MAGIC_NO_CHECK_ELF | MAGIC_NO_CHECK_COMPRESS;
 	const magic_t m = magic_open(flags | MAGIC_MIME_TYPE);
 
 	if(!m)
@@ -311,14 +454,11 @@ int main(int argc, char** argv) {
 
 	log_info("input: got %zu bytes", content.length);
 
-	// check MIME type
-	check_mime_type(content);
+	// check input type
+	check_input_type(content);
 
 	// parse input
 	GumboOutput* const doc = parse(content);
-
-	if(doc->errors.length > 0)
-		log_warn("input: detected %u HTML error(s)", doc->errors.length);
 
 	// write output
 	write_document(doc);
@@ -326,6 +466,9 @@ int main(int argc, char** argv) {
 	// flush output buffer
 	if(fclose(stdout))
 		die_errno("writing output");
+
+	if(doc->errors.length > 0)
+		log_info("all done; %u HTML error(s) corrected", doc->errors.length);
 
 	// purists are welcome to uncomment these lines:
 	// gumbo_destroy_output(&kGumboDefaultOptions, doc);

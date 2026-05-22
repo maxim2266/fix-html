@@ -19,7 +19,7 @@ do
         continue
     fi
 
-    if "$APP" -qq "$input" | diff -qZ - "$expected"
+    if "$APP" -qq "$input" | diff -qZ - "$expected" >/dev/null
 	then
         echo "PASS: $name"
         ((PASSED++))
@@ -31,4 +31,4 @@ done
 
 echo "---"
 echo "Passed: $PASSED, Failed: $FAILED"
-exit $FAILED
+[ $FAILED -eq 0 ]
