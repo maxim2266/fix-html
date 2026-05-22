@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <err.h>
 #include <errno.h>
@@ -163,14 +164,18 @@ GumboOutput* parse(const str content) {
 // MIME type --------------------------------------------------------------------------------------
 static
 bool mime_type_allowed(const char* const mime) {
-	// list of MIME type we accept, apart from text/html
+	// list of MIME types we accept, apart from text/html
+	// reason: libmagic is not perfect
 	static
 	const char* const allowed[] = {
 		"text/plain",
 		"text/xml",
+		"text/css",
+		"text/javascript",
 		"application/xml",
 		"application/xhtml+xml",
 		"application/x-empty",
+		"application/javascript",
 		NULL
 	};
 
@@ -184,15 +189,16 @@ bool mime_type_allowed(const char* const mime) {
 
 static
 void check_mime_type(const str s) {
-	const int flags = MAGIC_MIME_TYPE | MAGIC_RAW | MAGIC_NO_CHECK_ELF | MAGIC_NO_CHECK_ENCODING;
-	const magic_t m = magic_open(flags);
+	const int flags = MAGIC_RAW | MAGIC_NO_CHECK_ELF;
+	const magic_t m = magic_open(flags | MAGIC_MIME_TYPE);
 
 	if(!m)
-		die("cannot open MIME type detector");
+		die_errno("cannot open MIME type detector");
 
 	if(magic_load(m, NULL))
 		die("cannot load MIME type database: %s", magic_error(m));
 
+	// MIME type
 	const char* const mime = magic_buffer(m, s.data, s.length);
 
 	if(!mime)
@@ -204,6 +210,18 @@ void check_mime_type(const str s) {
 
 		log_warn("input: detected MIME type is \"%s\", not \"text/html\"", mime);
 	}
+
+	// encoding
+	if(magic_setflags(m, flags | MAGIC_MIME_ENCODING) < 0)
+		die("failed to set MIME flags: %s", magic_error(m));
+
+	const char* const enc =  magic_buffer(m, s.data, s.length);
+
+	if(!enc)
+		die("input: cannot detect encoding: %s", magic_error(m));
+
+	if(strcasecmp(enc, "us-ascii") && strcasecmp(enc, "utf-8"))
+		die("input: detected encoding is \"%s\", only ASCII and UTF-8 are supported", enc);
 
 	magic_close(m);
 }
@@ -300,7 +318,7 @@ int main(int argc, char** argv) {
 	GumboOutput* const doc = parse(content);
 
 	if(doc->errors.length > 0)
-		log_warn("detected %u HTML error(s)", doc->errors.length);
+		log_warn("input: detected %u HTML error(s)", doc->errors.length);
 
 	// write output
 	write_document(doc);
