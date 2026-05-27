@@ -286,15 +286,6 @@ void write_node(const GumboNode* const node) {
 	}
 }
 
-// write out HTML document
-static
-void write_document(GumboOutput* output) {
-	if(output && output->root)
-		write_node(output->document);
-	else
-		die("likely a badly broken input, the parser has failed");
-}
-
 // parse input
 static
 GumboOutput* parse(const str content) {
@@ -310,12 +301,14 @@ GumboOutput* parse(const str content) {
 static
 const char usage_string[] =
 "Usage:\n"
-"  %1$s [-q] [html-file]\n"
+"  %1$s [-q] [HTML-FILE]\n"
+"  %1$s [-q] -i HTML-FILE\n"
 "  %1$s [-hv]\n"
 "\n"
 "Fix broken HTML files.\n"
 "\n"
 "Options:\n"
+"  -i   Modify input file in-place.\n"
 "  -q   Reduce logging level (may be given more than once).\n"
 "  -h   Show this help and exit.\n"
 "  -v   Show version and exit.\n";
@@ -329,15 +322,24 @@ void usage_exit(const char* exe) {
 	exit(EXIT_FAILURE);
 }
 
+// settings
+static
+const char* file_name = NULL;	// file to modify in-place
+
 // option parser
 static
 void parse_options(int argc, char** argv) {
+	int c;
+	bool in_place = false;
+
 	opterr = 0;
 
-	int c;
-
-	while((c = getopt(argc, argv, "qhv")) != -1) {
+	while((c = getopt(argc, argv, ":iqhv")) != -1) {
 		switch(c) {
+			case 'i':	// in-place modification
+				in_place = true;
+				break;
+
 			case 'q':	// log level
 				++log_level;
 				break;
@@ -356,12 +358,18 @@ void parse_options(int argc, char** argv) {
 
 	// check the number of remaining parameters
 	switch(argc - optind) {
-		case 0: // ok, data from STDIN
+		case 0: // data from STDIN to STDOUT
+			if(in_place)
+				die("missing file name");
+
 			break;
 
 		case 1: // redirect STDIN
 			if(!freopen(argv[optind], "r", stdin))
 				die_errno("cannot open \"%s\"", argv[optind]);
+
+			if(in_place)
+				file_name = argv[optind];
 
 			break;
 
@@ -372,9 +380,8 @@ void parse_options(int argc, char** argv) {
 
 // main
 int main(int argc, char** argv) {
-	// i/o buffering
+	// make STDERR line-buffered
 	setvbuf(stderr, NULL, _IOLBF, 0);
-	setvbuf(stdout, NULL, _IOFBF, 0);
 
 	// options
 	parse_options(argc, argv);
@@ -389,10 +396,18 @@ int main(int argc, char** argv) {
 		die("empty input");
 
 	// parse input
-	GumboOutput* const doc = parse(content);
+	GumboOutput* const dom = parse(content);
+
+	if(!dom || !dom->root)
+		die("unparseable input");
 
 	// write output
-	write_document(doc);
+	if(!file_name)
+		setvbuf(stdout, NULL, _IOFBF, 0);
+	else if(!freopen(file_name, "w", stdout))
+		die_errno("cannot open \"%s\" for writing", file_name);
+
+	write_node(dom->document);
 
 	// flush output buffer
 	if(fclose(stdout))
