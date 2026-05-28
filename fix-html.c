@@ -24,33 +24,6 @@
 #define NOINLINE	static __attribute__((noinline))
 
 // logging ----------------------------------------------------------------------------------------
-static
-unsigned log_level = 0u;
-
-#define log_info(fmt, ...) ({	\
-	if(log_level == 0u)	\
-		warnx("[info] " fmt __VA_OPT__(,) __VA_ARGS__);	\
-})
-
-#define log_info_errno(fmt, ...) ({	\
-	if(log_level == 0u)	\
-		warn("[info] " fmt __VA_OPT__(,) __VA_ARGS__);	\
-})
-
-#define log_warn(fmt, ...) ({	\
-	if(log_level <= 1u)	\
-		warnx("[warn] " fmt __VA_OPT__(,) __VA_ARGS__);	\
-})
-
-#define log_warn_errno(fmt, ...) ({	\
-	if(log_level <= 1u)	\
-		warn("[warn] " fmt __VA_OPT__(,) __VA_ARGS__);	\
-})
-
-#define log_err(fmt, ...)		 warnx("[error] " fmt __VA_OPT__(,) __VA_ARGS__)
-#define log_err_errno(fmt, ...)	 warn("[error] " fmt __VA_OPT__(,) __VA_ARGS__)
-
-// termination
 #define die(fmt, ...)		errx(EXIT_FAILURE, "[error] " fmt __VA_OPT__(,) __VA_ARGS__)
 #define die_errno(fmt, ...)	err(EXIT_FAILURE, "[error] " fmt __VA_OPT__(,) __VA_ARGS__)
 
@@ -301,15 +274,14 @@ GumboOutput* parse(const str content) {
 static
 const char usage_string[] =
 "Usage:\n"
-"  %1$s [-q] [HTML-FILE]\n"
-"  %1$s [-q] -i HTML-FILE\n"
+"  %1$s [HTML-FILE]\n"
+"  %1$s -i HTML-FILE\n"
 "  %1$s [-hv]\n"
 "\n"
 "Fix broken HTML files.\n"
 "\n"
 "Options:\n"
 "  -i   Modify input file in-place.\n"
-"  -q   Reduce logging level (may be given more than once).\n"
 "  -h   Show this help and exit.\n"
 "  -v   Show version and exit.\n";
 
@@ -334,14 +306,10 @@ void parse_options(int argc, char** argv) {
 
 	opterr = 0;
 
-	while((c = getopt(argc, argv, ":iqhv")) != -1) {
+	while((c = getopt(argc, argv, ":ihv")) != -1) {
 		switch(c) {
 			case 'i':	// in-place modification
 				in_place = true;
-				break;
-
-			case 'q':	// log level
-				++log_level;
 				break;
 
 			case 'h':	// help
@@ -352,7 +320,10 @@ void parse_options(int argc, char** argv) {
 				exit(EXIT_FAILURE);
 
 			case '?':
-				die("unrecognised option `-%c`", optopt);
+				if(strcmp(argv[optind], "--help") == 0)
+					usage_exit(*argv);
+				else
+					die("unrecognised option `%s`", argv[optind]);
 		}
 	}
 
@@ -366,7 +337,7 @@ void parse_options(int argc, char** argv) {
 
 		case 1: // redirect STDIN
 			if(!freopen(argv[optind], "r", stdin))
-				die_errno("cannot open \"%s\"", argv[optind]);
+				die_errno("cannot open \"%s\" for reading", argv[optind]);
 
 			if(in_place)
 				file_name = argv[optind];
