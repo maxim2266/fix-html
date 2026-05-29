@@ -1,21 +1,19 @@
 # files
 BIN    := fix-html
-CFILES := $(BIN).c
+CFILES := src/main.c src/writer.c src/reader.c
 
 # compiler flags
 WARN_CFLAGS := -Wall -Wextra -Wformat -Werror=format-security \
 	       -Werror=implicit-function-declaration -Werror=int-conversion
 
-BASE_CFLAGS := -s -O2 -std=c11 -pipe $(WARN_CFLAGS)
-
-override CFLAGS := $(BASE_CFLAGS) $(CFLAGS)
+override CFLAGS := -s -O2 -std=c11 -pipe $(WARN_CFLAGS) $(CFLAGS)
 
 # targets
 .PHONY: all static clean test install uninstall
 
 all: $(BIN)
 
-$(BIN): $(CFILES) version
+$(BIN): $(CFILES) version src/fix-html.h
 	$(CC) $(CFLAGS) -DVER=$(shell ./version) -o $@ $(CFILES) -lgumbo
 
 static: CFLAGS += -static-pie
