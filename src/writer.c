@@ -1,7 +1,5 @@
 #include "fix-html.h"
 
-#include <strings.h>
-
 // output stream error check
 #define fail_if(cond) ({ \
 	if(cond) {  \
@@ -97,10 +95,6 @@ void write_attr(const char* s) {
 				repl = str_lit("&quot;");
 				break;
 
-			case '\'':
-				repl = str_lit("&apos;");
-				break;
-
 			default:
 				++p;
 				continue;
@@ -150,31 +144,6 @@ void write_comment(const char* s) {
 	write_lit("-->");
 }
 
-// write out raw text
-static
-void write_raw_text(const char* s, const char* const tag) {
-	if(!s)
-		return;
-
-	const size_t tag_len = strlen(tag);
-	const char* p = s;
-
-	while(*p) {
-		if(p[0] == '<' && p[1] == '/' && strncasecmp(p + 2, tag, tag_len) == 0) {
-			p += 2;
-			write_bytes(s, p - s);  	// up to and including '/'
-			write_byte('\\');
-			write_bytes(p, tag_len);	// the tag
-			s = (p += tag_len);
-			continue;
-		}
-
-		++p;
-	}
-
-	write_bytes(s, p - s);
-}
-
 // write out a string with prefix and closing quote if the string is not empty
 static
 bool cond_write(const char* const s, const str prefix) {
@@ -208,14 +177,61 @@ void write_doctype(const GumboDocument* const doc) {
 	write_lit(">\n");
 }
 
+// element classification
+static
+bool is_void(const GumboElement* const element) {
+	switch(element->tag) {
+		case GUMBO_TAG_AREA:	case GUMBO_TAG_BASE:	case GUMBO_TAG_BR:
+		case GUMBO_TAG_COL:		case GUMBO_TAG_EMBED:	case GUMBO_TAG_HR:
+		case GUMBO_TAG_IMG:		case GUMBO_TAG_INPUT:	case GUMBO_TAG_KEYGEN:
+		case GUMBO_TAG_LINK:	case GUMBO_TAG_META:	case GUMBO_TAG_PARAM:
+		case GUMBO_TAG_SOURCE:	case GUMBO_TAG_TRACK:	case GUMBO_TAG_WBR:
+			return true;
+
+		default:
+			return false;
+	}
+}
+
+static
+bool is_foreign(const GumboElement* const element) {
+	return element->tag_namespace == GUMBO_NAMESPACE_SVG
+		|| element->tag_namespace == GUMBO_NAMESPACE_MATHML;
+}
+
+// write element tag name
+static
+void write_tag_name(const GumboElement* const element) {
+	// known tag
+	if(element->tag != GUMBO_TAG_UNKNOWN) {
+		write_cstr(gumbo_normalized_tagname(element->tag));
+		return;
+	}
+
+	// recover tag name from the original text
+	str tag = element->original_tag;
+
+	gumbo_tag_from_original_text(&tag);
+
+	// try to fix SVG tags
+	if(element->tag_namespace == GUMBO_NAMESPACE_SVG) {
+		const char* const s = gumbo_normalize_svg_tagname(&tag);
+
+		if(s && *s) {
+			write_cstr(s);
+			return;
+		}
+	}
+
+	write_str(tag);
+}
+
 // write out element
 static
 void write_element(const GumboElement* const element) {
-	const char* const tag = gumbo_normalized_tagname(element->tag);
-
 	// write tag
 	write_byte('<');
-	write_cstr(tag);
+	write_tag_name(element);
 
 	// write attributes
 	for(unsigned i = 0; i < element->attributes.length; i++) {
@@ -235,24 +251,27 @@ void write_element(const GumboElement* const element) {
 		write_byte('"');
 	}
 
+	if(is_void(element)) {
+		write_byte('>');
+		return;
+	}
+
+	if(element->children.length == 0 && is_foreign(element)) {
+		write_lit(" />");
+		return;
+	}
+
 	write_byte('>');
 
 	// write content
 	switch(element->tag) {
-		case GUMBO_TAG_AREA:	case GUMBO_TAG_BASE:	case GUMBO_TAG_BR:
-		case GUMBO_TAG_COL:		case GUMBO_TAG_EMBED:	case GUMBO_TAG_HR:
-		case GUMBO_TAG_IMG:		case GUMBO_TAG_INPUT:	case GUMBO_TAG_KEYGEN:
-		case GUMBO_TAG_LINK:	case GUMBO_TAG_META:	case GUMBO_TAG_PARAM:
-		case GUMBO_TAG_SOURCE:	case GUMBO_TAG_TRACK:	case GUMBO_TAG_WBR:
-			return;	// void tag
-
 		case GUMBO_TAG_SCRIPT:
 		case GUMBO_TAG_STYLE:
 			for(unsigned i = 0; i < element->children.length; i++) {
 				const GumboNode* const child = element->children.data[i];
 
 				if(child->type == GUMBO_NODE_TEXT)
-					write_raw_text(child->v.text.text, tag);
+					write_cstr(child->v.text.text);
 				else
 					write_node(child);	// just in case...
 			}
@@ -268,7 +287,7 @@ void write_element(const GumboElement* const element) {
 
 	// close the tag
 	write_lit("</");
-	write_cstr(tag);
+	write_tag_name(element);
 	write_byte('>');
 }
 
@@ -295,6 +314,11 @@ void write_node(const GumboNode* const node) {
 			break;
 
 		case GUMBO_NODE_CDATA:
+			write_lit("<![CDATA[");
+			write_cstr(node->v.text.text);
+			write_lit("]]>");
+			break;
+
 		case GUMBO_NODE_TEXT:
 			write_html(node->v.text.text);
 			break;
