@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <locale.h>
 
 #ifndef VER
 #error "program version constant is not defined"
@@ -98,9 +99,15 @@ void parse_options(int argc, char** argv) {
 }
 
 // main
+#define LOC	"C.utf8"
+
 int main(int argc, char** argv) {
 	// make STDERR line-buffered
 	setvbuf(stderr, NULL, _IOLBF, 0);
+
+	// locale
+	if(!setlocale(LC_ALL, LOC))
+		die("cannot set \"" LOC "\" locale");
 
 	// options
 	parse_options(argc, argv);

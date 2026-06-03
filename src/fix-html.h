@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <err.h>
 
 #include <gumbo.h>
@@ -27,6 +28,11 @@ typedef GumboStringPiece str;
 
 #define str_lit(s)		((str){ s "", sizeof(s) - 1 })
 #define str_null		((str){ 0 })
+
+static inline
+str str_from_cstr(const char* s) {
+	return s ? ((str){ s, strlen(s) }) : str_null;
+}
 
 // input reader
 str read_input(const int fd);
