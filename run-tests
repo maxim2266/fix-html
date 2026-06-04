@@ -1,34 +1,34 @@
 #!/bin/bash
 
-set -o pipefail
+set -eo pipefail
 
-APP="./fix-html"
-INPUT_DIR="tests/input"
-EXPECTED_DIR="tests/expected"
 FAILED=0
 PASSED=0
 
-for input in "$INPUT_DIR"/*.html
+APP='../fix-html'
+
+cd tests >/dev/null
+
+for fname in 'bad.html' 'basic.html' 'utf8.html'
 do
-    name=$(basename "$input")
-    expected="$EXPECTED_DIR/$name"
+    expected="expected-$fname"
 
     if [ ! -f "$expected" ]
-	then
-        echo "SKIP: $name (no expected output)"
+    then
+        echo >&2 "SKIP: $fname (no expected output)"
         continue
     fi
 
-    if "$APP" "$input" | diff -qZ - "$expected" >/dev/null
-	then
-        echo "PASS: $name"
-        ((PASSED++))
+    if "$APP" "$fname" | diff -u --color - "$expected"
+    then
+        echo >&2 "PASS: $fname"
+        ((PASSED++)) || true
     else
-        echo "FAIL: $name"
-        ((FAILED++))
+        echo >&2 "FAIL: $fname"
+        ((FAILED++)) || true
     fi
 done
 
-echo "---"
-echo "Passed: $PASSED, Failed: $FAILED"
+echo >&2 "---"
+echo >&2 "Passed: $PASSED, Failed: $FAILED"
 [ $FAILED -eq 0 ]

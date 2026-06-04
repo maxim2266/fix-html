@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>UTF-8 Test</title></head><body>
+
+<!-- Valid UTF-8 sequences -->
+<p>ASCII: Hello World</p>
+<p>2-byte: ¢ © ®</p>
+<p>3-byte: € ™ ∞</p>
+<p>4-byte: 😀 🔥</p>
+
+<!-- C1 control characters (U+0080-U+009F) -->
+<p>C1 controls: � � � �</p>
+
+<!-- Non-characters (U+FDD0-U+FDEF) -->
+<p>Non-chars: � � �</p>
+
+<!-- Surrogates (U+D800-U+DFFF) -->
+<p>Surrogates: ��� ��� ���</p>
+
+<!-- Overlong sequences -->
+<p>Overlong: �� �� ���</p>
+
+<!-- Invalid UTF-8 bytes -->
+<p>Invalid bytes: � � �</p>
+
+<!-- Truncated sequence at EOF -->
+<p>Truncated: �</p></body></html>

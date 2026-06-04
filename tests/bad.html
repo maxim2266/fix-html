@@ -1,0 +1,91 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta charset=utf-8>
+<title>HTML Errors Test Suite</title>
+<link rel=stylesheet href=style.css>
+</head>
+<body>
+
+<!-- This comment has -- double dashes -- and a trailing dash --->
+
+<div id=main class='content' disabled>
+<h1>Welcome to the <em>Test</em> Suite</h1>
+
+<p>This paragraph has <b>bold <i>italic</b> text</i> with bad nesting.
+
+<br>
+<hr noshade>
+<img src=photo.jpg alt='A "photo" & more'>
+<input type=text value="it's working" disabled>
+
+<p>Unquoted attributes: <input type=checkbox checked name=agree>
+
+<p>Character references: if a &lt; b &amp;&amp; c &gt; d
+
+<p>Named entities: &copy; &reg; &trade; &euro;
+
+<ul>
+<li>First item
+<li>Second item
+<li>Third item
+</ul>
+
+<table>
+<tr>
+<td>Cell 1
+<td>Cell 2<table><tr><td>Nested</td></tr></table>
+</tr>
+</table>
+
+<form>
+<select>
+<option>Option 1
+<option selected>Option 2
+</select>
+</form>
+
+<script>
+// Script with special characters
+var x = 42;
+if (a < b && c > d) {
+    console.log("hello world");
+}
+</script>
+
+<style>
+/* Style with special characters */
+.test::before {
+    content: "<>";
+}
+.class { color: red; }
+</style>
+
+<textarea>
+This textarea contains tags: <div>test</div>
+But these should be escaped in the output.
+</textarea>
+
+<title>Title with <special> chars</title>
+
+<p>Missing closing tags:
+<em>italic
+<strong>bold
+<span>span
+</div>
+
+<p>SVG with CDATA section:</p>
+
+<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    <![CDATA[
+      .svg-class { fill: red; }
+      .svg-class:hover { fill: blue; }
+    ]]>
+  </style>
+  <circle cx="50" cy="50" r="40" class="svg-class" />
+  <text x="50" y="55" text-anchor="middle" font-size="12">SVG Test</text>
+</svg>
+
+</body>
+</html>
