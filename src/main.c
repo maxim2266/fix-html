@@ -1,8 +1,6 @@
 #include "fix-html.h"
 
-#include <string.h>
 #include <unistd.h>
-#include <stdint.h>
 #include <locale.h>
 
 #ifndef VER
@@ -140,7 +138,7 @@ int main(int argc, char** argv) {
 		die_errno("writing output");
 
 	// purists are welcome to uncomment these lines:
-	// gumbo_destroy_output(&kGumboDefaultOptions, doc);
+	// gumbo_destroy_output(&kGumboDefaultOptions, dom);
 	// free((void*)content.data);
 
 	return 0;

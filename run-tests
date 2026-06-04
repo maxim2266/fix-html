@@ -19,7 +19,7 @@ do
         continue
     fi
 
-    if "$APP" "$fname" | diff -u --color - "$expected"
+    if "$APP" "$fname" | diff -uZ --color - "$expected"
     then
         echo >&2 "PASS: $fname"
         ((PASSED++)) || true

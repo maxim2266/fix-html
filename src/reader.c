@@ -17,7 +17,7 @@ typedef struct {
 } codepoint_info;
 
 static
-codepoint_info next_codepoint(mbstate_t* const ps, const char* const s, size_t n) {
+codepoint_info next_codepoint(mbstate_t* const ps, const char* const s, const size_t n) {
 	char32_t c;
 
 	// https://en.cppreference.com/c/string/multibyte/mbrtoc32
@@ -38,8 +38,8 @@ codepoint_info next_codepoint(mbstate_t* const ps, const char* const s, size_t n
 			}
 
 		case 2 ... 4:
-			// check for non-characters
 			return (codepoint_info){
+				// check for non-characters
 				((c & 0xFFFE) != 0xFFFE && (c < 0xFDD0 || c > 0xFDEF)) ? CP_OK : CP_BAD,
 				len
 			};
@@ -60,7 +60,7 @@ codepoint_info next_codepoint(mbstate_t* const ps, const char* const s, size_t n
 
 // fill input buffer
 static
-size_t read_bytes(const int fd, char* buff, const char* const end) {
+size_t read_bytes(const int fd, char* const buff, const char* const end) {
 	char* p = buff;
 	ssize_t n;
 

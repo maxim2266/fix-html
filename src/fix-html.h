@@ -30,7 +30,7 @@ typedef GumboStringPiece str;
 #define str_null		((str){ 0 })
 
 static inline
-str str_from_cstr(const char* s) {
+str str_from_cstr(const char* const s) {
 	return s ? ((str){ s, strlen(s) }) : str_null;
 }
 
