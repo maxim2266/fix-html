@@ -2,7 +2,7 @@
 
 [![License: BSD 3 Clause](https://img.shields.io/badge/License-BSD_3--Clause-yellow.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
-`fix-html` is a Linux CLI tool that reads UTF-8 HTML input and produces clean, well-formed
+`fix-html` is a Linux CLI tool that reads HTML input and produces clean, well-formed
 HTML5 output.
 
 ### Why?
@@ -13,7 +13,7 @@ broken HTML from a file or STDIN, and get back valid HTML5 on STDOUT. There is a
 to modify a file in-place.
 
 ### How it works
-Processing happens in three stages:
+Processing stages:
 1. The entire input is read into memory, with invalid or disallowed UTF-8 sequences replaced by `�`;
 2. The Gumbo parser builds a DOM tree from the cleaned input, tolerating a wide range of
 markup errors;
