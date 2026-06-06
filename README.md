@@ -37,7 +37,7 @@ Usage:
   fix-html -i HTML-FILE
   fix-html [-hv]
 
-Fix broken HTML files.
+Read any HTML input and produce clean, well-formed HTML5 output.
 
 Options:
   -i         Modify input file in-place.
