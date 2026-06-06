@@ -94,6 +94,10 @@ void parse_options(int argc, char** argv) {
 		default:
 			die("cannot process more than one input file (%d given)", argc - optind);
 	}
+
+	// make sure input is not a TTY
+	if(isatty(STDIN_FILENO))
+		usage_exit(*argv);
 }
 
 // main
