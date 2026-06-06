@@ -13,8 +13,9 @@ broken HTML from a file or STDIN, and get back valid HTML5 on STDOUT. There is a
 to modify a file in-place.
 
 ### How it works
-Processing stages:
-1. The entire input is read into memory, with invalid or disallowed UTF-8 sequences replaced by `�`;
+The input is processed in 3 stages:
+1. The entire input is read into memory, with invalid or disallowed UTF-8 sequences replaced
+by `�` (U+FFFD);
 2. The Gumbo parser builds a DOM tree from the cleaned input, tolerating a wide range of
 markup errors;
 3. The DOM tree is serialised into proper HTML5 with correct escaping and structure.
@@ -24,6 +25,9 @@ markup errors;
 - Input must be UTF-8 encoded; no conversion is performed;
 - Some corrections may lose data. The guiding principle is that original and processed
 documents should render identically in a browser.
+- The parser sometimes inserts new tags as required by the HTML5 standard (see example below)
+to make sure the output is always a complete HTML5 document. Depending on the particular
+situation this may or may not be desirable.
 
 ### Invocation
 ```console
@@ -36,12 +40,12 @@ Usage:
 Fix broken HTML files.
 
 Options:
-  -i   Modify input file in-place.
-  -h   Show this help and exit.
-  -v   Show version and exit.
+  -i         Modify input file in-place.
+  -h/--help  Show this help and exit.
+  -v         Show version and exit.
 ```
 
-#### Example  
+#### Example
 ```console
 ▶ fix-html <<< '<p>Broken <b>bold <i>italic</b> text'
 <!DOCTYPE html>
@@ -50,7 +54,7 @@ Options:
 ```
 
 ### Setup
-#### Prerequisites  
+#### Prerequisites
 - C11 compiler (GCC or Clang) on Linux
 - [Gumbo parser](https://codeberg.org/grisha/gumbo-parser) library (`sudo apt install libgumbo-dev`)
 - GNU Make

@@ -25,12 +25,12 @@ const char usage_string[] =
 "  %1$s -i HTML-FILE\n"
 "  %1$s [-hv]\n"
 "\n"
-"Fix broken HTML files.\n"
+"Read any HTML input and produce clean, well-formed HTML5 output.\n"
 "\n"
 "Options:\n"
-"  -i   Modify input file in-place.\n"
-"  -h   Show this help and exit.\n"
-"  -v   Show version and exit.\n";
+"  -i         Modify input file in-place.\n"
+"  -h/--help  Show this help and exit.\n"
+"  -v         Show version and exit.\n";
 
 // usage string display
 NORETURN
