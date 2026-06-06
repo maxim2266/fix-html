@@ -226,6 +226,30 @@ void write_tag_name(const GumboElement* const element) {
 	write_str(tag);
 }
 
+// attribute name validator
+static
+bool is_valid_attr_name(const char* s) {
+	if(!s || *s == 0)
+		return false;
+
+	do {
+		switch(*s) {
+			case 'a' ... 'z':
+			case 'A' ... 'Z':
+			case '0' ... '9':
+			case '_': case '-': case '.': case ':':
+				continue;
+
+			default:
+				// reject remaining ASCII characters
+				if((unsigned char)*s < 0x80)
+					return false;
+		}
+	} while(*++s != 0);
+
+	return true;
+}
+
 // write out element
 static
 void write_element(const GumboElement* const element) {
@@ -237,7 +261,7 @@ void write_element(const GumboElement* const element) {
 	for(unsigned i = 0; i < element->attributes.length; i++) {
 		const GumboAttribute* const attr = element->attributes.data[i];
 
-		if(strpbrk(attr->name, "<>\"'= \t\n\r"))
+		if(!is_valid_attr_name(attr->name))
 			continue;	// skip attributes with invalid symbols
 
 		write_byte(' ');
