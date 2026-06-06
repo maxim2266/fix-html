@@ -67,10 +67,10 @@ void parse_options(int argc, char** argv) {
 				exit(EXIT_FAILURE);
 
 			case '?':
-				if(strcmp(argv[optind], "--help") == 0)
+				if(argv[optind] && strcmp(argv[optind], "--help") == 0)
 					usage_exit(*argv);
 				else
-					die("unrecognised option `%s`", argv[optind]);
+					die("unrecognised option `-%c`", optopt);
 		}
 	}
 
