@@ -49,14 +49,14 @@ const char* file_name = NULL;	// file to modify in-place
 NOINLINE
 void parse_options(int argc, char** argv) {
 	int c;
-	bool in_place = false;
 
-	opterr = 0;
-
-	while((c = getopt(argc, argv, ":ihv")) != -1) {
+	while((c = getopt(argc, argv, ":i:hv")) != -1) {
 		switch(c) {
 			case 'i':	// in-place modification
-				in_place = true;
+				if(file_name)
+					die("cannot process more than one input file");
+
+				file_name = optarg;
 				break;
 
 			case 'h':	// help
@@ -66,7 +66,10 @@ void parse_options(int argc, char** argv) {
 				fwrite(XSTR(VER) "\n", sizeof(XSTR(VER)), 1, stderr);
 				exit(EXIT_FAILURE);
 
-			case '?':
+			case ':':	// missing '-i' parameter
+				die("missing file name argument");
+
+			case '?':	// invalid option
 				if(argv[optind] && strcmp(argv[optind], "--help") == 0)
 					usage_exit(*argv);
 				else
@@ -74,30 +77,30 @@ void parse_options(int argc, char** argv) {
 		}
 	}
 
-	// check the number of remaining parameters
+	// check remaining parameters
 	switch(argc - optind) {
-		case 0: // data from STDIN to STDOUT
-			if(in_place)
-				die("missing file name");
+		case 0:
+			if(file_name && !freopen(file_name, "r", stdin))
+				die_errno("cannot open \"%s\" for reading", file_name);
+
+			if(!file_name && isatty(STDIN_FILENO))	// make sure input is not a TTY
+				usage_exit(*argv);
 
 			break;
 
-		case 1: // redirect STDIN
+		case 1:
+			if(file_name)
+				die("cannot process more than one input file (2 given)");
+
 			if(!freopen(argv[optind], "r", stdin))
 				die_errno("cannot open \"%s\" for reading", argv[optind]);
-
-			if(in_place)
-				file_name = argv[optind];
 
 			break;
 
 		default:
-			die("cannot process more than one input file (%d given)", argc - optind);
+			die("cannot process more than one input file (%d given)",
+				argc - optind + (file_name ? 1 : 0));
 	}
-
-	// make sure input is not a TTY
-	if(isatty(STDIN_FILENO))
-		usage_exit(*argv);
 }
 
 // main
